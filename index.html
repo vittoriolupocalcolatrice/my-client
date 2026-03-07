@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>My Clienti</title>
+
+<!-- ██████████████████████████████████████████████████
+     FIREBASE SDK
+██████████████████████████████████████████████████ -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
 
@@ -29,6 +36,30 @@
     min-height: 100vh;
     padding-bottom: 90px;
   }
+
+  /* ── LOADING SCREEN ── */
+  #loadingScreen {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9999; gap: 20px;
+  }
+  #loadingScreen .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 28px; }
+  #loadingScreen .logo span { color: var(--accent); }
+  .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loadingMsg { font-size: 14px; color: var(--muted); }
+
+  /* ── FIREBASE CONFIG BANNER ── */
+  #configBanner {
+    position: fixed; inset: 0; background: var(--bg);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9999; padding: 30px 24px; text-align: center;
+  }
+  #configBanner.show { display: flex; }
+  #configBanner .icon { font-size: 52px; margin-bottom: 16px; }
+  #configBanner h2 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; margin-bottom: 10px; }
+  #configBanner p { font-size: 14px; color: var(--muted); line-height: 1.7; max-width: 420px; }
+  #configBanner code { background: var(--surface2); border-radius: 6px; padding: 2px 8px; font-size: 13px; color: var(--accent); }
 
   header {
     background: var(--surface);
@@ -203,6 +234,30 @@
 </head>
 <body>
 
+<!-- ██████████████████████████████████████████████████
+     LOADING SCREEN
+██████████████████████████████████████████████████ -->
+<div id="loadingScreen">
+  <div class="logo">MY<span>.</span>CLIENTI</div>
+  <div class="spinner"></div>
+  <div id="loadingMsg">Connessione al cloud...</div>
+</div>
+
+<!-- ██████████████████████████████████████████████████
+     CONFIG BANNER (mostrato se Firebase non è configurato)
+██████████████████████████████████████████████████ -->
+<div id="configBanner">
+  <div class="icon">🔧</div>
+  <h2>Configura Firebase</h2>
+  <p>
+    Per usare l'app su tutti i dispositivi devi inserire la tua configurazione Firebase nel codice.<br><br>
+    Apri il file HTML con un editor di testo, cerca il blocco:<br>
+    <code>INCOLLA QUI LA TUA CONFIG FIREBASE</code><br><br>
+    e sostituiscilo con i dati del tuo progetto Firebase.<br><br>
+    Segui la guida nella pagina di istruzioni fornita con il file.
+  </p>
+</div>
+
 <header>
   <div class="header-top">
     <div class="logo">MY<span>.</span>CLIENTI</div>
@@ -343,7 +398,6 @@
     <div class="modal-handle"></div>
     <div class="modal-title">⚙️ Gestione Categorie</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Le categorie predefinite non si possono eliminare. Aggiungi le tue categorie personalizzate.</div>
-
     <div class="form-group">
       <label>Aggiungi nuova categoria</label>
       <div class="new-cat-row">
@@ -352,18 +406,15 @@
         <button onclick="addCustomCat()">+ Aggiungi</button>
       </div>
     </div>
-
     <div class="form-group">
       <label>Categorie predefinite</label>
       <div class="custom-cat-list" id="defaultCatList"></div>
     </div>
-
     <div class="form-group" id="customCatSection">
       <label>Categorie personalizzate</label>
       <div class="custom-cat-list" id="customCatList"></div>
       <div id="noCatMsg" style="font-size:13px;color:var(--muted)">Nessuna categoria personalizzata ancora.</div>
     </div>
-
     <button class="btn-cancel" onclick="closeModal('catModal')">Chiudi</button>
   </div>
 </div>
@@ -373,7 +424,7 @@
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title">💾 Backup Dati</div>
-    <div style="font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.6">Esporta i tuoi dati per fare un backup o spostarli su un altro dispositivo.</div>
+    <div style="font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.6">Esporta i tuoi dati per fare un backup locale.</div>
     <div style="background:var(--surface2);border-radius:12px;padding:16px;margin-bottom:12px">
       <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px">📤 Esporta dati</div>
       <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Scarica un file JSON con tutti i tuoi dealer ed eventi.</div>
@@ -392,10 +443,31 @@
 <div class="toast" id="toast"></div>
 
 <script>
-let clienti = JSON.parse(localStorage.getItem('myClienti') || '[]');
-let eventi   = JSON.parse(localStorage.getItem('myEventi')  || '[]');
-let customCats = JSON.parse(localStorage.getItem('myCustomCats') || '[]');
-// customCats: [{id, emoji, nome}]
+// ════════════════════════════════════════════════════════════
+//  ⚙️  CONFIGURAZIONE FIREBASE  ⚙️
+//  Sostituisci i valori qui sotto con quelli del tuo progetto
+//  Li trovi su: console.firebase.google.com
+//  → Il tuo progetto → Impostazioni → Le tue app → Configurazione
+// ════════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "AIzaSyAX_x4bTozWcfhUAve_MJQCJn3VQ9QFMck",
+  authDomain:        "myclients-a074c.firebaseapp.com",
+  projectId:         "myclients-a074c",
+  storageBucket:     "myclients-a074c.firebasestorage.app",
+  messagingSenderId: "689744127871",
+  appId:             "1:689744127871:web:73f8793dd58e23fd4b5c4a",
+  measurementId:     "G-DQV5ZCC580"
+};
+// ════════════════════════════════════════════════════════════
+
+// ── Rilevamento config non compilata ──────────────────────
+const CONFIG_VALIDA = firebaseConfig.apiKey !== "INCOLLA_QUI_LA_TUA_CONFIG_FIREBASE";
+
+// ── Variabili globali ─────────────────────────────────────
+let clienti    = [];
+let eventi     = [];
+let customCats = [];
+let db, DOC_CLIENTI, DOC_EVENTI, DOC_CATS;
 
 let editClienteId = null;
 let editEventoId  = null;
@@ -407,11 +479,11 @@ let calYear  = today.getFullYear();
 let calMonth = today.getMonth();
 let calSelectedDate = toYMD(today);
 
-// Default categories (fixed)
+// ── Categorie predefinite ─────────────────────────────────
 const DEFAULT_CATS = [
   {id:'auto',             emoji:'🚗', nome:'Auto'},
   {id:'moto',             emoji:'🏍️', nome:'Moto'},
-  {id:'arredo',           emoji:'🛋', nome:'Arredo'},
+  {id:'arredo',           emoji:'🛋',  nome:'Arredo'},
   {id:'dentista',         emoji:'🦷', nome:'Dentista'},
   {id:'infissi',          emoji:'🪟', nome:'Infissi'},
   {id:'clima',            emoji:'❄️', nome:'Clima/PDC'},
@@ -419,33 +491,12 @@ const DEFAULT_CATS = [
   {id:'benessere',        emoji:'🏋️', nome:'Benessere'},
 ];
 
-// Default avatar/badge colors for fixed cats
 const DEFAULT_COLORS = {
   auto:'#e8c547', moto:'#fd9644', arredo:'#4fc3f7', dentista:'#81ecec',
   infissi:'#a29bfe', clima:'#74b9ff', ristrutturazioni:'#e17055', benessere:'#55efc4'
 };
-
-// Custom cat colors palette (cycles)
 const CUSTOM_PALETTE = ['#ff7675','#a29bfe','#55efc4','#fd79a8','#fdcb6e','#e17055','#74b9ff','#00cec9'];
 
-function getCatColor(catId) {
-  if (DEFAULT_COLORS[catId]) return DEFAULT_COLORS[catId];
-  const idx = customCats.findIndex(c=>c.id===catId);
-  return CUSTOM_PALETTE[idx % CUSTOM_PALETTE.length] || '#999';
-}
-
-function getAllCats() {
-  return [...DEFAULT_CATS, ...customCats.map(c=>({id:c.id, emoji:c.emoji, nome:c.nome}))];
-}
-
-function getCatLabel(catId) {
-  const all = getAllCats();
-  const c = all.find(x=>x.id===catId);
-  return c ? c.emoji+' '+c.nome : '📦 '+catId;
-}
-
-// fase: 'potenziale' | 'convenzionato'
-// sottostato (solo se convenzionato): 'da_attivare' | 'attivo' | 'inattivo'
 const statoConf = {
   potenziale:      {dot:'status-potenziale',      label:'Potenziale',      color:'#fdcb6e'},
   accordo_firmato: {dot:'status-accordo-firmato', label:'Accordo firmato', color:'#fd9644'},
@@ -453,18 +504,126 @@ const statoConf = {
   attivo:          {dot:'status-attivo',           label:'Attivo',          color:'#00b894'},
   inattivo:        {dot:'status-inattivo',         label:'Inattivo ⚠️',     color:'#ff5c5c'},
 };
-const mesiIT = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const mesiIT   = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const giorniIT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
 
-function saveC() { localStorage.setItem('myClienti', JSON.stringify(clienti)); }
-function saveE() { localStorage.setItem('myEventi',  JSON.stringify(eventi));  }
-function saveCats() { localStorage.setItem('myCustomCats', JSON.stringify(customCats)); }
+// ── Utilità ───────────────────────────────────────────────
 function uid()   { return Date.now().toString(36)+Math.random().toString(36).substr(2); }
 function initials(n) { return n.split(' ').map(w=>w[0]).join('').substr(0,2).toUpperCase(); }
 function toYMD(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function formatDate(d) { if(!d) return ''; const [y,m,g]=d.split('-'); return `${g}/${m}/${y}`; }
 function formatDateFull(d) { if(!d) return ''; return new Date(d+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'}); }
 
+function getCatColor(catId) {
+  if (DEFAULT_COLORS[catId]) return DEFAULT_COLORS[catId];
+  const idx = customCats.findIndex(c=>c.id===catId);
+  return CUSTOM_PALETTE[idx % CUSTOM_PALETTE.length] || '#999';
+}
+function getAllCats() { return [...DEFAULT_CATS, ...customCats.map(c=>({id:c.id, emoji:c.emoji, nome:c.nome}))]; }
+function getCatLabel(catId) {
+  const all = getAllCats();
+  const c = all.find(x=>x.id===catId);
+  return c ? c.emoji+' '+c.nome : '📦 '+catId;
+}
+
+// ── FIREBASE SAVE ─────────────────────────────────────────
+function saveC()    { if(DOC_CLIENTI) DOC_CLIENTI.set({items: clienti}).catch(()=>showToast('⚠️ Errore salvataggio cloud!')); }
+function saveE()    { if(DOC_EVENTI)  DOC_EVENTI.set({items: eventi}).catch(()=>showToast('⚠️ Errore salvataggio cloud!')); }
+function saveCats() { if(DOC_CATS)    DOC_CATS.set({items: customCats}).catch(()=>showToast('⚠️ Errore salvataggio cloud!')); }
+
+// ── INIT APP ──────────────────────────────────────────────
+async function initApp() {
+  // Mostra config banner se Firebase non è configurato
+  if (!CONFIG_VALIDA) {
+    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('configBanner').classList.add('show');
+    return;
+  }
+
+  try {
+    document.getElementById('loadingMsg').textContent = 'Connessione al cloud...';
+
+    // Inizializza Firebase
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    DOC_CLIENTI = db.collection('myclienti').doc('dati');
+    DOC_EVENTI  = db.collection('myeventi').doc('dati');
+    DOC_CATS    = db.collection('mycustomcats').doc('dati');
+
+    document.getElementById('loadingMsg').textContent = 'Caricamento dati...';
+
+    // Carica dati in parallelo
+    const [snapC, snapE, snapCats] = await Promise.all([
+      DOC_CLIENTI.get(),
+      DOC_EVENTI.get(),
+      DOC_CATS.get()
+    ]);
+
+    clienti    = snapC.exists    ? (snapC.data().items    || []) : [];
+    eventi     = snapE.exists    ? (snapE.data().items    || []) : [];
+    customCats = snapCats.exists ? (snapCats.data().items || []) : [];
+
+    // Prima esecuzione: inserisci dati demo
+    if (clienti.length === 0) {
+      clienti = [
+        {id:uid(),nome:'Autorimessa Bianchi SRL',categoria:'auto',fase:'convenzionato',sottostato:'attivo',referente:'Marco Bianchi',telefono:'06 1234567',citta:'Roma',indirizzo:'Via Tuscolana 45',email:'info@bianchi.it',note:'Convenzione firmata. Follow-up mensile.',dataContatto:'2025-10-12',dataConv:'2025-11-01',creato:new Date().toISOString()},
+        {id:uid(),nome:'Studio Dentistico Rossi',categoria:'dentista',fase:'potenziale',sottostato:null,referente:'Dr. Rossi',telefono:'06 9876543',citta:'Roma',indirizzo:'Viale Parioli 12',email:'',note:'Interessato. Richiamare.',dataContatto:'2025-12-05',dataConv:'',creato:new Date().toISOString()},
+        {id:uid(),nome:'Arredi Moderni Verdi',categoria:'arredo',fase:'potenziale',sottostato:null,referente:'Luca Verdi',telefono:'347 8765432',citta:'Tivoli',indirizzo:'Via Tiburtina 210',email:'luca@arredimoderni.it',note:'',dataContatto:'2026-01-15',dataConv:'',creato:new Date().toISOString()},
+      ];
+      saveC();
+      const t2=new Date(today); t2.setDate(t2.getDate()+1);
+      const t5=new Date(today); t5.setDate(t5.getDate()+5);
+      eventi = [
+        {id:uid(),tipo:'appuntamento',clienteId:clienti[1].id,titolo:'Presentazione convenzione',data:toYMD(t2),ora:'10:30',note:'Portare materiale informativo'},
+        {id:uid(),tipo:'followup',clienteId:clienti[2].id,titolo:'Follow-up Verdi',data:toYMD(t5),ora:'15:00',note:'Richiamare per conferma interesse'},
+      ];
+      saveE();
+    }
+
+    // Migrazione categorie
+    const defaultIds = DEFAULT_CATS.map(c=>c.id);
+    const before = customCats.length;
+    customCats = customCats.filter(c => !defaultIds.includes(c.id));
+    customCats = customCats.filter(c => {
+      const n = c.nome.toLowerCase().replace(/\s/g,'');
+      return !['ristrutturazioni','benessere','moto','auto'].includes(n);
+    });
+    if (customCats.length !== before) saveCats();
+
+    // Migrazione fase/sottostato
+    let migrato = false;
+    clienti.forEach(c => {
+      if (!c.fase) {
+        migrato = true;
+        const s = c.stato || 'potenziale';
+        if      (s==='potenziale')      { c.fase='potenziale';      c.sottostato=null; }
+        else if (s==='accordo_firmato') { c.fase='accordo_firmato'; c.sottostato=null; }
+        else if (s==='convenzionato')   { c.fase='convenzionato';   c.sottostato='da_attivare'; }
+        else if (s==='attivo')          { c.fase='convenzionato';   c.sottostato='attivo'; }
+        else if (s==='da_attivare')     { c.fase='convenzionato';   c.sottostato='da_attivare'; }
+        else if (s==='inattivo')        { c.fase='convenzionato';   c.sottostato='inattivo'; }
+        else                            { c.fase='potenziale';      c.sottostato=null; }
+      }
+    });
+    if (migrato) saveC();
+
+    // Nascondi loading e mostra app
+    document.getElementById('loadingScreen').style.display = 'none';
+
+    // Render
+    renderFilterRow();
+    populateCatSelect();
+    renderList();
+    updateBadge();
+
+  } catch(err) {
+    console.error(err);
+    document.getElementById('loadingMsg').textContent = '⚠️ Errore: ' + (err.message || 'connessione fallita');
+    document.getElementById('loadingMsg').style.color = '#ff5c5c';
+  }
+}
+
+// ── RENDER ────────────────────────────────────────────────
 function renderFilterRow() {
   const row = document.getElementById('filterRow');
   const all = getAllCats();
@@ -494,9 +653,7 @@ function renderFilterRow() {
 }
 
 function openCatModal() {
-  // default cats
-  const defHtml = DEFAULT_CATS.map(c=>`
-    <div class="custom-cat-chip">${c.emoji} ${c.nome}</div>`).join('');
+  const defHtml = DEFAULT_CATS.map(c=>`<div class="custom-cat-chip">${c.emoji} ${c.nome}</div>`).join('');
   document.getElementById('defaultCatList').innerHTML = defHtml;
   renderCustomCatList();
   document.getElementById('newCatEmoji').value='';
@@ -507,9 +664,7 @@ function openCatModal() {
 function renderCustomCatList() {
   const list = document.getElementById('customCatList');
   const msg  = document.getElementById('noCatMsg');
-  if (!customCats.length) {
-    list.innerHTML=''; msg.style.display='block'; return;
-  }
+  if (!customCats.length) { list.innerHTML=''; msg.style.display='block'; return; }
   msg.style.display='none';
   list.innerHTML = customCats.map(c=>`
     <div class="custom-cat-chip">
@@ -597,7 +752,6 @@ function renderList() {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">${clienti.length===0?'Nessun esercente ancora.<br>Premi + per aggiungerne uno.':'Nessun risultato trovato.'}</div></div>`;
     return;
   }
-  // Grouping
   const groups = {attivo:[],da_attivare:[],inattivo:[],accordo_firmato:[],potenziale:[]};
   filtered.forEach(c => {
     if (c.fase==='convenzionato') {
@@ -688,7 +842,6 @@ function openEditCliente(id) {
   document.getElementById('f_indirizzo').value=c.indirizzo||''; document.getElementById('f_email').value=c.email||'';
   document.getElementById('f_note').value=c.note||'';
   populateCatSelect(c.categoria||'auto');
-  // support legacy data with c.stato
   const fase = c.fase || ((['potenziale'].includes(c.stato)) ? 'potenziale' : c.stato ? 'convenzionato' : 'potenziale');
   const sottostato = c.sottostato || (['attivo','da_attivare','inattivo'].includes(c.stato) ? c.stato : 'da_attivare');
   document.getElementById('f_fase').value = fase;
@@ -728,7 +881,7 @@ function modificaPratiche(id, delta) {
   c.storiaPratiche.push({delta, data:oggi, nota:''});
   saveC();
   renderList();
-  openDetail(id); // refresh detail
+  openDetail(id);
   showToast(delta>0 ? `📄 Pratica aggiunta! Totale: ${nuove}` : `📄 Pratica rimossa. Totale: ${nuove}`);
 }
 
@@ -753,7 +906,7 @@ function openDetail(id) {
         <div class="event-type-dot ${e.tipo==='followup'?'dot-followup':'dot-appuntamento'}"></div>
         <div class="event-info"><div class="event-title">${e.titolo}</div><div class="event-meta">${formatDate(e.data)}${e.ora?' · '+e.ora:''}</div></div>
       </div>`).join('')}
-    </div>`:''  ;
+    </div>`:'' ;
   const fields=[
     ['Categoria', catLabel],
     ['Fase', faseLabel],
@@ -977,17 +1130,13 @@ function updateBadge() {
 
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function closeIfOverlay(e,id){if(e.target===document.getElementById(id))closeModal(id);}
-function openBackupModal() {
-  document.getElementById('backupModal').classList.add('open');
-}
+function openBackupModal() { document.getElementById('backupModal').classList.add('open'); }
 
 function esportaDati() {
   const backup = {
     versione: '1.0',
     data: new Date().toISOString(),
-    clienti: JSON.parse(localStorage.getItem('myClienti')||'[]'),
-    eventi:  JSON.parse(localStorage.getItem('myEventi')||'[]'),
-    customCats: JSON.parse(localStorage.getItem('myCustomCats')||'[]')
+    clienti, eventi, customCats
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
@@ -1028,69 +1177,9 @@ function importaDati(event) {
 }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
-if(clienti.length===0){
-  clienti=[
-    {id:uid(),nome:'Autorimessa Bianchi SRL',categoria:'auto',stato:'attivo',referente:'Marco Bianchi',telefono:'06 1234567',citta:'Roma',indirizzo:'Via Tuscolana 45',email:'info@bianchi.it',note:'Convenzione firmata. Follow-up mensile.',dataContatto:'2025-10-12',dataConv:'2025-11-01',creato:new Date().toISOString()},
-    {id:uid(),nome:'Studio Dentistico Rossi',categoria:'dentista',stato:'potenziale',referente:'Dr. Rossi',telefono:'06 9876543',citta:'Roma',indirizzo:'Viale Parioli 12',email:'',note:'Interessato. Richiamare.',dataContatto:'2025-12-05',dataConv:'',creato:new Date().toISOString()},
-    {id:uid(),nome:'Arredi Moderni Verdi',categoria:'arredo',stato:'potenziale',referente:'Luca Verdi',telefono:'347 8765432',citta:'Tivoli',indirizzo:'Via Tiburtina 210',email:'luca@arredimoderni.it',note:'',dataContatto:'2026-01-15',dataConv:'',creato:new Date().toISOString()},
-  ];
-  saveC();
-  const t2=new Date(today); t2.setDate(t2.getDate()+1);
-  const t5=new Date(today); t5.setDate(t5.getDate()+5);
-  eventi=[
-    {id:uid(),tipo:'appuntamento',clienteId:clienti[1].id,titolo:'Presentazione convenzione',data:toYMD(t2),ora:'10:30',note:'Portare materiale informativo'},
-    {id:uid(),tipo:'followup',clienteId:clienti[2].id,titolo:'Follow-up Verdi',data:toYMD(t5),ora:'15:00',note:'Richiamare per conferma interesse'},
-  ];
-  saveE();
-}
 
-// ── MIGRAZIONE ───────────────────────────────────────
-// Rimuovi categorie custom che ora sono predefinite
-const defaultIds = DEFAULT_CATS.map(c=>c.id);
-const before = customCats.length;
-customCats = customCats.filter(c => !defaultIds.includes(c.id));
-customCats = customCats.filter(c => {
-  const n = c.nome.toLowerCase().replace(/\s/g,'');
-  return !['ristrutturazioni','benessere','moto','auto'].includes(n);
-});
-if (customCats.length !== before) saveCats();
-
-// Migra vecchi dealer con campo 'stato' al nuovo formato fase+sottostato
-let migrazioneEseguita = false;
-clienti.forEach(c => {
-  if (!c.fase) {
-    migrazioneEseguita = true;
-    const s = c.stato || 'potenziale';
-    if (s === 'potenziale') {
-      c.fase = 'potenziale';
-      c.sottostato = null;
-    } else if (s === 'accordo_firmato') {
-      c.fase = 'accordo_firmato';
-      c.sottostato = null;
-    } else if (s === 'convenzionato') {
-      c.fase = 'convenzionato';
-      c.sottostato = 'da_attivare';
-    } else if (s === 'attivo') {
-      c.fase = 'convenzionato';
-      c.sottostato = 'attivo';
-    } else if (s === 'da_attivare') {
-      c.fase = 'convenzionato';
-      c.sottostato = 'da_attivare';
-    } else if (s === 'inattivo') {
-      c.fase = 'convenzionato';
-      c.sottostato = 'inattivo';
-    } else {
-      c.fase = 'potenziale';
-      c.sottostato = null;
-    }
-  }
-});
-if (migrazioneEseguita) saveC();
-
-renderFilterRow();
-populateCatSelect();
-renderList();
-updateBadge();
+// ── AVVIO ─────────────────────────────────────────────────
+initApp();
 </script>
 </body>
 </html>
