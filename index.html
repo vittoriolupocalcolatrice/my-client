@@ -10,6 +10,10 @@
 ██████████████████████████████████████████████████ -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script>
+  // Assicura che Firebase sia pronto prima di avviare l'app
+  window.firebaseReady = false;
+</script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
@@ -610,11 +614,40 @@ async function initApp() {
     // Nascondi loading e mostra app
     document.getElementById('loadingScreen').style.display = 'none';
 
-    // Render
+    // Primo render
     renderFilterRow();
     populateCatSelect();
     renderList();
     updateBadge();
+
+    // ── LISTENERS IN TEMPO REALE ─────────────────────────
+    // L'app si aggiorna automaticamente su tutti i dispositivi
+    DOC_CLIENTI.onSnapshot(snap => {
+      if (!snap.exists) return;
+      clienti = snap.data().items || [];
+      renderFilterRow();
+      populateCatSelect();
+      renderList();
+      updateBadge();
+      if (currentView==='Calendario') renderCalendar();
+      if (currentView==='Prossimi')   renderUpcoming();
+    });
+
+    DOC_EVENTI.onSnapshot(snap => {
+      if (!snap.exists) return;
+      eventi = snap.data().items || [];
+      renderList();
+      updateBadge();
+      if (currentView==='Calendario') renderCalendar();
+      if (currentView==='Prossimi')   renderUpcoming();
+    });
+
+    DOC_CATS.onSnapshot(snap => {
+      if (!snap.exists) return;
+      customCats = snap.data().items || [];
+      renderFilterRow();
+      populateCatSelect();
+    });
 
   } catch(err) {
     console.error(err);
@@ -1179,7 +1212,15 @@ function importaDati(event) {
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 // ── AVVIO ─────────────────────────────────────────────────
-initApp();
+// Aspetta che tutto il DOM e gli script siano pronti
+window.addEventListener('load', function() {
+  if (typeof firebase === 'undefined') {
+    document.getElementById('loadingMsg').textContent = '⚠️ Errore: controlla la connessione internet e ricarica la pagina.';
+    document.getElementById('loadingMsg').style.color = '#ff5c5c';
+    return;
+  }
+  initApp();
+});
 </script>
 </body>
 </html>
